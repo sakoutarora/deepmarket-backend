@@ -9,6 +9,7 @@ import (
 
 func Setup(app *fiber.App) {
 	app.Get("/tickers", handlers.GetTickers)
+	app.Get("/expiries", handlers.GetTickerExpiries())
 
 	app.Use("/ws", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
