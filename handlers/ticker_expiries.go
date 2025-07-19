@@ -3,20 +3,22 @@
 package handlers
 
 import (
-	"strconv"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gulll/deepmarket/database"
-	"github.com/gulll/deepmarket/models"
 )
+
+type ExpiryDate struct {
+	ExpiryDate time.Time `json:"expiry_date"`
+	LotSize    float32   `json:"lot_size"`
+}
 
 func GetTickerExpiries() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		tickerSymbol := c.Query("ticker")
 		dateParam := c.Query("date")
-		strikePriceParam := c.Query("strike_price")
-		optionTypeParam := c.Query("option_type")
 
 		if tickerSymbol == "" || dateParam == "" {
 			return c.Status(400).JSON(fiber.Map{
@@ -24,7 +26,7 @@ func GetTickerExpiries() fiber.Handler {
 			})
 		}
 
-		// Parse date
+		// Parse the date
 		fromDate, err := time.Parse("2006-01-02", dateParam)
 		if err != nil {
 			return c.Status(400).JSON(fiber.Map{
@@ -32,50 +34,38 @@ func GetTickerExpiries() fiber.Handler {
 			})
 		}
 
-		// Find ticker ID
-		var ticker models.Ticker
-		if err := database.DB.Where("ticker_symbol = ?", tickerSymbol).First(&ticker).Error; err != nil {
-			return c.Status(404).JSON(fiber.Map{
-				"error": "ticker not found",
-			})
-		}
+		// Raw results
+		var rawResults []ExpiryDate
 
-		// Build query
-		query := database.DB.Where("ticker_id = ? AND expiry_date > ?", ticker.ID, fromDate)
+		err = database.DB.
+			Table("ticker_expiries").
+			Select("ticker_expiries.expiry_date, ticker_expiries.lot_size").
+			Joins("LEFT JOIN tickers ON ticker_expiries.ticker_id = tickers.id").
+			Where("tickers.ticker_symbol = ? AND ticker_expiries.expiry_date > ?", tickerSymbol, fromDate).
+			Group("ticker_expiries.expiry_date, ticker_expiries.lot_size").
+			Scan(&rawResults).Error
 
-		if strikePriceParam != "" {
-			strikePrice, err := strconv.ParseFloat(strikePriceParam, 64)
-			if err != nil {
-				return c.Status(400).JSON(fiber.Map{
-					"error": "invalid strike_price format",
-				})
-			}
-			query = query.Where("strike_price = ?", strikePrice)
-		}
-
-		if optionTypeParam != "" {
-			query = query.Where("option_type = ?", optionTypeParam)
-		}
-
-		// Execute query
-		var expiries []models.TickerExpiry
-		if err := query.Find(&expiries).Error; err != nil {
+		if err != nil {
+			fmt.Printf("DB error: %v\n", err)
 			return c.Status(500).JSON(fiber.Map{
-				"error": "failed to fetch ticker expiries",
+				"error": "failed to fetch distinct expiry dates",
 			})
 		}
 
-		// Prepare minimal response
-		var result []fiber.Map
-		for _, expiry := range expiries {
-			result = append(result, fiber.Map{
-				"expiry_date":  expiry.ExpiryDate,
-				"option_type":  expiry.OptionType,
-				"strike_price": expiry.StrikePrice,
-				"lot_size":     expiry.LotSize,
+		// Format only date part (YYYY-MM-DD)
+		type ExpiryDateResponse struct {
+			ExpiryDate string  `json:"expiry_date"`
+			LotSize    float32 `json:"lot_size"`
+		}
+
+		var response []ExpiryDateResponse
+		for _, item := range rawResults {
+			response = append(response, ExpiryDateResponse{
+				ExpiryDate: item.ExpiryDate.Format("2006-01-02"),
+				LotSize:    item.LotSize,
 			})
 		}
 
-		return c.JSON(result)
+		return c.JSON(response)
 	}
 }
