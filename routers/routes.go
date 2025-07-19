@@ -21,7 +21,7 @@ func Setup(app *fiber.App) {
 	api.Get("/tickers", handlers.GetTickers)
 	api.Get("/expiries", handlers.GetTickerExpiries())
 	api.Get("/option_chain", handlers.FetchOptionChain)
-  app.Get("/news", handlers.GetNewsList)
+	api.Get("/news", handlers.GetNewsList)
 
 	app.Use("/ws", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
