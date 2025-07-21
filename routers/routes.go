@@ -30,5 +30,6 @@ func Setup(app *fiber.App) {
 		return fiber.ErrUpgradeRequired
 	})
 
-	app.Get("/ws", websocket.New(handlers.OhlcWebSocketHandler))
+	// app.Get("/ws", websocket.New(handlers.OhlcWebSocketHandler))
+	app.Get("/ws", websocket.New(handlers.WsHandler))
 }
