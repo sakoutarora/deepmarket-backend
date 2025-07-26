@@ -39,7 +39,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 COPY --from=builder /app/.env . 
 # Expose the port your application listens on
-EXPOSE 8000
+EXPOSE 443
 
 # Set environment variables if needed (e.g., for database connection)
 # ENV DATABASE_URL=your_database_url
