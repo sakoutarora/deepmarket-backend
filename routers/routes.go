@@ -12,6 +12,10 @@ import (
 func Setup(app *fiber.App) {
 	app.Use(middleware.Logger())
 
+	app.Get("/api/health", func(c *fiber.Ctx) error {
+		return c.SendString("Hello over HTTPS!")
+	})
+
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 	}))
