@@ -34,10 +34,12 @@ FROM alpine:latest
 RUN apk add --no-cache tzdata
 
 WORKDIR /app
+RUN mkdir /cmd
 
 # Copy only the built binary from the builder stage
 COPY --from=builder /app/main .
 COPY --from=builder /app/.env . 
+COPY --from=builder /app/cmd/* cmd/
 # Expose the port your application listens on
 EXPOSE 443
 
