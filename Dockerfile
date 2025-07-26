@@ -41,7 +41,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/.env . 
 COPY --from=builder /app/cmd/* cmd/
 # Expose the port your application listens on
-EXPOSE 443
+EXPOSE 8080
 
 # Set environment variables if needed (e.g., for database connection)
 # ENV DATABASE_URL=your_database_url

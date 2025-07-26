@@ -15,8 +15,8 @@ func main() {
 
 	routers.Setup(app)
 
-	log.Println("Server running on :443")
-	err := app.ListenTLS(":443", "./cmd/cert.pem", "./cmd/key.pem") // Use 443 or any port
+	log.Println("Server running on :8080")
+	err := app.Listen(":8080")
 	if err != nil {
 		log.Fatal(err)
 	}
