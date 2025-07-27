@@ -22,5 +22,8 @@ func main() {
 	routers.Setup(app)
 
 	log.Println("Server running on :8080")
-	log.Fatal(app.Listen(":8080"))
+	err := app.Listen(":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
