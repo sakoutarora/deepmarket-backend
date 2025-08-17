@@ -9,14 +9,20 @@ import (
 )
 
 func GetTickers(c *fiber.Ctx) error {
-	var symbols []string
+	type Ticker struct {
+		ID             int    `json:"id"`
+		TradingSymbol  string `json:"trading_symbol"`
+	}
 
-	// Only pluck "ticker_symbol" column
-	if err := database.DB.Model(&struct {
-	}{}).Table("tickers").Pluck("ticker_symbol", &symbols).Error; err != nil {
+	var tickers []Ticker
+
+	if err := database.DB.
+		Table("tickers").
+		Select("id, trading_symbol").
+		Scan(&tickers).Error; err != nil {
 		log.Printf("Error fetching ticker symbols: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch tickers"})
 	}
 
-	return c.JSON(symbols)
+	return c.JSON(tickers)
 }
