@@ -2,8 +2,8 @@
 package handlers
 
 import (
-	domain "github.com/gulll/deepmarket/domain/backtesting"
-	engine "github.com/gulll/deepmarket/engine/backtesting"
+	domain "github.com/gulll/deepmarket/backtesting/domain"
+	engine "github.com/gulll/deepmarket/backtesting/engine"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gulll/deepmarket/models"

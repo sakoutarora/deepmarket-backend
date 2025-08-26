@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	domain "github.com/gulll/deepmarket/domain/backtesting"
+	domain "github.com/gulll/deepmarket/backtesting/domain"
 	"gorm.io/gorm"
 )
 

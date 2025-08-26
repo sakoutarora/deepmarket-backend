@@ -1,8 +1,9 @@
 package handlers
 
 import (
-	domain "github.com/gulll/deepmarket/domain/backtesting"
-	engine "github.com/gulll/deepmarket/engine/backtesting"
+	domain "github.com/gulll/deepmarket/backtesting/domain"
+	engine "github.com/gulll/deepmarket/backtesting/engine"
+	"github.com/gulll/deepmarket/models"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -31,19 +32,32 @@ func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Hand
 	return func(c *fiber.Ctx) error {
 		var req BacktestReq
 		if err := c.BodyParser(&req); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "bad json"})
+			return c.Status(400).JSON(models.APIResponse{
+				Success: false,
+				Message: "Invalid Request format",
+			})
 		}
 		if _, ok := domain.AllowedTF[req.BaseTF]; !ok {
-			return c.Status(400).JSON(fiber.Map{"error": "invalid base timeframe"})
+			return c.Status(400).JSON(models.APIResponse{
+				Success: false,
+				Message: "Invalid Base Timeframe",
+			})
+
 		}
 		if len(req.Conditions) == 0 {
-			return c.Status(400).JSON(fiber.Map{"error": "no conditions"})
+			return c.Status(400).JSON(models.APIResponse{
+				Success: false,
+				Message: "No conditions provided",
+			})
 		}
 
 		// Parse the first condition’s tokens into a predicate
 		pred, err := parser.ParsePredicate(req.Conditions[0].Tokens)
 		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+			return c.Status(400).JSON(models.APIResponse{
+				Success: false,
+				Message: err.Error(),
+			})
 		}
 
 		results := make([]BacktestSymbolResult, 0, len(req.Symbols))
@@ -51,7 +65,10 @@ func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Hand
 			ctx := engine.NewEvalCtx(sym, req.BaseTF, dp, reg)
 			boolSer, err := ctx.EvalPred(pred)
 			if err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": err.Error(), "symbol": sym})
+				return c.Status(500).JSON(models.APIResponse{
+					Success: false,
+					Message: err.Error(),
+				})
 			}
 			results = append(results, BacktestSymbolResult{
 				Symbol:  sym,
@@ -59,7 +76,11 @@ func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Hand
 				Entries: risingEdges(boolSer),
 			})
 		}
-		return c.JSON(BacktestResp{BaseTF: req.BaseTF, Results: results})
+		return c.JSON(models.APIResponse{
+			Success: true,
+			Message: "Backtest completed",
+			Data:    BacktestResp{BaseTF: req.BaseTF, Results: results},
+		})
 	}
 }
 

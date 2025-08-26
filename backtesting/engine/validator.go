@@ -7,7 +7,7 @@ import (
 	"maps"
 	"slices"
 
-	domain "github.com/gulll/deepmarket/domain/backtesting"
+	domain "github.com/gulll/deepmarket/backtesting/domain"
 )
 
 var mathPrecedence = map[string]int{

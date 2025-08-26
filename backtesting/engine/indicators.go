@@ -4,7 +4,7 @@ package engine
 import (
 	"errors"
 
-	domain "github.com/gulll/deepmarket/domain/backtesting"
+	domain "github.com/gulll/deepmarket/backtesting/domain"
 )
 
 func BuildRegistry() *Registry {

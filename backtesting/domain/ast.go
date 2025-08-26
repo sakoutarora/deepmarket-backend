@@ -16,7 +16,7 @@ type (
 	}
 	FunctionNode struct {
 		Name string
-		Args map[string]any // may include nested ExprNode for "expression" args
+		Args map[string]any
 	}
 
 	// math binary: + - * / % ^

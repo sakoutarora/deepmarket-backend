@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	domain "github.com/gulll/deepmarket/domain/backtesting"
+	domain "github.com/gulll/deepmarket/backtesting/domain"
 )
 
 type Series []float64

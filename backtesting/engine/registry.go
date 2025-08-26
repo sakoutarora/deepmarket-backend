@@ -1,7 +1,7 @@
 // domain/registry.go
 package engine
 
-import domain "github.com/gulll/deepmarket/domain/backtesting"
+import domain "github.com/gulll/deepmarket/backtesting/domain"
 
 type ArgSpec struct {
 	Name string
