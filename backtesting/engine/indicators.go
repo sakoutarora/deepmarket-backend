@@ -16,11 +16,7 @@ func BuildRegistry() *Registry {
 	reg.Indicators["Close"] = IndicatorSpec{
 		Category: "Price", Description: "Closing price",
 		Eval: func(ctx *EvalCtx, tf domain.Timeframe, _ map[string]float64, offset int) ([]float64, error) {
-			data, err := ctx.Data.LoadOHLCV(ctx.Symbol, tf)
-			if err != nil {
-				return nil, err
-			}
-			cl := data["close"]
+			cl := ctx.cache["close"]
 			if offset == 0 {
 				return cl, nil
 			}
@@ -46,13 +42,14 @@ func BuildRegistry() *Registry {
 			{Name: "mult", Type: "float", Req: true},
 		},
 		Eval: func(ctx *EvalCtx, tf domain.Timeframe, params map[string]float64, offset int) ([]float64, error) {
-			// implement (use ATR and hl2 envelopes). For brevity here, return Close as placeholder.
-			data, err := ctx.Data.LoadOHLCV(ctx.Symbol, tf)
-			if err != nil {
-				return nil, err
+			bars := make([]Candle, len(ctx.cache["close"]))
+			for i := range bars {
+				bars[i].High = ctx.cache["high"][i]
+				bars[i].Low = ctx.cache["low"][i]
+				bars[i].Close = ctx.cache["close"][i]
 			}
-			st := data["close"] // replace with actual ST calc
-			return st, nil
+			trend, _ := Supertrend(bars, int(params["period"]), params["mult"])
+			return trend, nil
 		},
 	}
 	// Function: sma(expression, periods)

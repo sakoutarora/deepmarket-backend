@@ -32,15 +32,19 @@ func NewEvalCtx(sym string, baseTF domain.Timeframe, dp DataProvider, reg *Regis
 	return &EvalCtx{Symbol: sym, BaseTF: baseTF, Data: dp, Reg: reg, cache: map[string]Series{}}
 }
 
+func (ctx *EvalCtx) GetCache() map[string]Series {
+	return ctx.cache
+}
+
+func (ctx *EvalCtx) SetCache(cache map[string]Series) {
+	ctx.cache = cache
+}
+
 func (ctx *EvalCtx) EvalExpr(n domain.ExprNode) (Series, error) {
 	switch v := n.(type) {
 	case domain.NumberNode:
 		// broadcast a constant to base length
-		base, err := ctx.Data.LoadOHLCV(ctx.Symbol, ctx.BaseTF)
-		if err != nil {
-			return nil, err
-		}
-		L := len(base["close"])
+		L := len(ctx.cache["close"])
 		out := make(Series, L)
 		for i := range out {
 			out[i] = v.Value

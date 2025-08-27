@@ -17,9 +17,10 @@ type BacktestReq struct {
 }
 
 type BacktestSymbolResult struct {
-	Symbol  string `json:"symbol"`
-	Signal  []bool `json:"signal"`
-	Entries []int  `json:"entries"`
+	Symbol  string                   `json:"symbol"`
+	Signal  []bool                   `json:"signal"`
+	Entries []int                    `json:"entries"`
+	Ts      map[string]engine.Series `json:"ts"`
 }
 type BacktestResp struct {
 	BaseTF  domain.Timeframe       `json:"base_timeframe"`
@@ -63,6 +64,15 @@ func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Hand
 		results := make([]BacktestSymbolResult, 0, len(req.Symbols))
 		for _, sym := range req.Symbols {
 			ctx := engine.NewEvalCtx(sym, req.BaseTF, dp, reg)
+			ohlc, err := dp.LoadOHLCV(sym, req.BaseTF)
+			if err != nil {
+				return c.Status(500).JSON(models.APIResponse{
+					Success: false,
+					Message: err.Error(),
+				})
+			}
+
+			ctx.SetCache(ohlc)
 			boolSer, err := ctx.EvalPred(pred)
 			if err != nil {
 				return c.Status(500).JSON(models.APIResponse{
@@ -74,6 +84,7 @@ func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Hand
 				Symbol:  sym,
 				Signal:  boolSer,
 				Entries: risingEdges(boolSer),
+				Ts:      ctx.GetCache(),
 			})
 		}
 		return c.JSON(models.APIResponse{
