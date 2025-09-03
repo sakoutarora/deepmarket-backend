@@ -162,6 +162,12 @@ func (p *Parser) parseComparison(ts []domain.Token) (domain.CompareNode, error) 
 		Right: rightExpr,
 	}, nil
 }
+func (p *Parser) parseExprTokens(ts []domain.Token) (domain.ExprNode, error) {
+	if len(ts) == 0 {
+		return nil, errors.New("empty expression tokens")
+	}
+	return p.parseExpr(ts)
+}
 
 func (p *Parser) parseExpr(ts []domain.Token) (domain.ExprNode, error) {
 	// stacks
@@ -202,8 +208,23 @@ func (p *Parser) parseExpr(ts []domain.Token) (domain.ExprNode, error) {
 			if err := checkArgs(spec.Params, params); err != nil {
 				return nil, fmt.Errorf("indicator %s: %w", t.Indicator, err)
 			}
+
+			// ✅ Parse nested args
+			var argNodes []domain.ExprNode
+			for _, argTok := range t.Args {
+				node, err := p.parseExprTokens([]domain.Token{argTok})
+				if err != nil {
+					return nil, fmt.Errorf("indicator %s arg: %w", t.Indicator, err)
+				}
+				argNodes = append(argNodes, node)
+			}
+
 			out = append(out, domain.IndicatorNode{
-				Name: t.Indicator, Timeframe: t.Timeframe, Params: params, Offset: t.Offset,
+				Name:      t.Indicator,
+				Timeframe: t.Timeframe,
+				Params:    params,
+				Offset:    t.Offset,
+				Args:      argNodes,
 			})
 
 		case domain.TokenFunction:
@@ -218,7 +239,27 @@ func (p *Parser) parseExpr(ts []domain.Token) (domain.ExprNode, error) {
 			if err := checkFuncArgs(spec.Params, raw); err != nil {
 				return nil, fmt.Errorf("function %s: %w", t.Function, err)
 			}
-			out = append(out, domain.FunctionNode{Name: t.Function, Args: raw})
+
+			// ✅ Parse nested args
+			var argNodes []domain.ExprNode
+			for _, argTok := range t.Args {
+				node, err := p.parseExprTokens([]domain.Token{argTok})
+				if err != nil {
+					return nil, fmt.Errorf("indicator %s arg: %w", t.Indicator, err)
+				}
+				argNodes = append(argNodes, node)
+			}
+
+			// Validate params
+			if err := checkFuncArgs(spec.Params, raw); err != nil {
+				return nil, fmt.Errorf("function %s: %w", t.Function, err)
+			}
+
+			out = append(out, domain.FunctionNode{
+				Name:   t.Function,
+				Params: raw,
+				Args:   argNodes,
+			})
 
 		case domain.TokenOperator:
 			op := t.Operator

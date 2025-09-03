@@ -1,53 +1,55 @@
 // domain/ast.go
 package domain
 
-type ExprNode interface {
-	isExpr()
+// ---- Expression & Predicate AST ----
+type ExprNode interface{ exprNode() }
+type PredNode interface{ predNode() }
+
+type NumberNode struct {
+	Value float64
 }
 
-type (
-	// leaf
-	NumberNode    struct{ Value float64 }
-	IndicatorNode struct {
-		Name      string
-		Timeframe Timeframe
-		Params    map[string]float64
-		Offset    int
-	}
-	FunctionNode struct {
-		Name string
-		Args map[string]any
-	}
+func (NumberNode) exprNode() {}
 
-	// math binary: + - * / % ^
-	BinaryMathNode struct {
-		Left  ExprNode
-		Op    string
-		Right ExprNode
-	}
-)
-
-func (NumberNode) isExpr()     {}
-func (IndicatorNode) isExpr()  {}
-func (FunctionNode) isExpr()   {}
-func (BinaryMathNode) isExpr() {}
-
-type PredNode interface {
-	isPred()
+type IndicatorNode struct {
+	Name      string
+	Timeframe Timeframe
+	Params    map[string]float64
+	Offset    int
+	Args      []ExprNode
 }
 
-type CompareNode struct {
+func (IndicatorNode) exprNode() {}
+
+type FunctionNode struct {
+	Name string
+	// Args can contain scalars (float64, int, string), nested ExprNode, or even lists
+	Params map[string]any
+	Args   []ExprNode
+}
+
+func (FunctionNode) exprNode() {}
+
+type BinaryMathNode struct {
 	Left  ExprNode
-	Op    string
+	Op    string // "+", "-", "*", "/", "%", "^"
 	Right ExprNode
 }
 
-func (CompareNode) isPred() {}
+func (BinaryMathNode) exprNode() {}
 
-type LogicalNode struct {
-	Op  string // AND/OR/NOT
-	Lhs PredNode
-	Rhs PredNode // Rhs is nil for NOT
+type CompareNode struct {
+	Left  ExprNode
+	Op    string // ">", ">=", "<", "<=", "==", "!=", "crosses_above", "crosses_below"
+	Right ExprNode
 }
 
-func (LogicalNode) isPred() {}
+func (CompareNode) predNode() {}
+
+type LogicalNode struct {
+	Op  string // "AND", "OR", "NOT"
+	Lhs PredNode
+	Rhs PredNode // optional for NOT
+}
+
+func (LogicalNode) predNode() {}

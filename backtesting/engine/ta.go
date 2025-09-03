@@ -2,19 +2,11 @@ package engine
 
 import (
 	"math"
-	"time"
+
+	domain "github.com/gulll/deepmarket/backtesting/domain"
 )
 
-// Candle represents an OHLCV bar.
-type Candle struct {
-	Time   time.Time
-	Open   float64
-	High   float64
-	Low    float64
-	Close  float64
-	Volume float64
-}
-
+// domain.Candle represents an OHLCV bar.
 // --- Helpers ---
 
 func max(a, b float64) float64 {
@@ -36,15 +28,15 @@ func abs(x float64) float64 {
 	return x
 }
 
-// sliceLastN returns a copy of the last n candles (n<=len).
-func sliceLastN(bars []Candle, n int) []Candle {
+// sliceLastN returns a copy of the last n domain.Candles (n<=len).
+func sliceLastN(bars []domain.Candle, n int) []domain.Candle {
 	if n <= 0 {
-		return []Candle{}
+		return []domain.Candle{}
 	}
 	if n > len(bars) {
 		n = len(bars)
 	}
-	out := make([]Candle, n)
+	out := make([]domain.Candle, n)
 	copy(out, bars[len(bars)-n:])
 	return out
 }
@@ -179,8 +171,8 @@ func StdDev(values []float64, p int) []float64 {
 	return out
 }
 
-// TrueRange for each candle.
-func TrueRange(bars []Candle) []float64 {
+// TrueRange for each domain.Candle.
+func TrueRange(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		hl := bars[i].High - bars[i].Low
@@ -195,13 +187,13 @@ func TrueRange(bars []Candle) []float64 {
 }
 
 // ATR Average True Range.
-func ATR(bars []Candle, p int) []float64 {
+func ATR(bars []domain.Candle, p int) []float64 {
 	tr := TrueRange(bars)
 	return EMA(tr, p)
 }
 
 // NATR Normalized ATR = 100 * ATR / Close
-func NATR(bars []Candle, p int) []float64 {
+func NATR(bars []domain.Candle, p int) []float64 {
 	atr := ATR(bars, p)
 	out := make([]float64, len(bars))
 	for i := range bars {
@@ -224,7 +216,7 @@ func BollingerBands(values []float64, p int, k float64) (ubb, mbb, lbb []float64
 }
 
 // KeltnerChannels using EMA and ATR: middle=EMA, upper=EMA+k*ATR, lower=EMA-k*ATR
-func KeltnerChannels(bars []Candle, emaPeriod int, atrPeriod int, k float64) (upper, mid, lower []float64) {
+func KeltnerChannels(bars []domain.Candle, emaPeriod int, atrPeriod int, k float64) (upper, mid, lower []float64) {
 	closes := ExtractCloses(bars)
 	mid = EMA(closes, emaPeriod)
 	atr := ATR(bars, atrPeriod)
@@ -238,7 +230,7 @@ func KeltnerChannels(bars []Candle, emaPeriod int, atrPeriod int, k float64) (up
 }
 
 // VWAP cumulative from start of slice.
-func VWAP(bars []Candle) []float64 {
+func VWAP(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	var pvCum, vCum float64
 	for i := range bars {
@@ -255,24 +247,24 @@ func VWAP(bars []Candle) []float64 {
 }
 
 // VWAPMA - moving average of VWAP.
-func VWAPMA(bars []Candle, p int) []float64 { return SMA(VWAP(bars), p) }
+func VWAPMA(bars []domain.Candle, p int) []float64 { return SMA(VWAP(bars), p) }
 
 // Extract close values.
-func ExtractCloses(bars []Candle) []float64 {
+func ExtractCloses(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		out[i] = bars[i].Close
 	}
 	return out
 }
-func ExtractHighs(bars []Candle) []float64 {
+func ExtractHighs(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		out[i] = bars[i].High
 	}
 	return out
 }
-func ExtractLows(bars []Candle) []float64 {
+func ExtractLows(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		out[i] = bars[i].Low
@@ -338,7 +330,7 @@ func RSI(values []float64, p int) []float64 {
 }
 
 // Stochastic %K and %D (SMA of %K)
-func Stochastic(bars []Candle, kPeriod, dPeriod int) (kVals, dVals []float64) {
+func Stochastic(bars []domain.Candle, kPeriod, dPeriod int) (kVals, dVals []float64) {
 	kVals = make([]float64, len(bars))
 	for i := range bars {
 		if i+1 < kPeriod {
@@ -367,7 +359,7 @@ func Stochastic(bars []Candle, kPeriod, dPeriod int) (kVals, dVals []float64) {
 }
 
 // Williams %R
-func WilliamsR(bars []Candle, p int) []float64 {
+func WilliamsR(bars []domain.Candle, p int) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		if i+1 < p {
@@ -411,7 +403,7 @@ func MACD(values []float64, fast, slow, signal int) (macd, sig, hist []float64) 
 }
 
 // OBV On-Balance Volume
-func OBV(bars []Candle) []float64 {
+func OBV(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	var cum float64
 	for i := range bars {
@@ -431,7 +423,7 @@ func OBV(bars []Candle) []float64 {
 }
 
 // MFI Money Flow Index
-func MFI(bars []Candle, p int) []float64 {
+func MFI(bars []domain.Candle, p int) []float64 {
 	if len(bars) == 0 {
 		return nil
 	}
@@ -463,7 +455,7 @@ func MFI(bars []Candle, p int) []float64 {
 }
 
 // CCI Commodity Channel Index
-func CCI(bars []Candle, p int) []float64 {
+func CCI(bars []domain.Candle, p int) []float64 {
 	typ := make([]float64, len(bars))
 	for i := range bars {
 		typ[i] = (bars[i].High + bars[i].Low + bars[i].Close) / 3
@@ -478,7 +470,7 @@ func CCI(bars []Candle, p int) []float64 {
 }
 
 // ADX with +DI and -DI (Wilder's smoothing)
-func ADX(bars []Candle, p int) (adx, plusDI, minusDI []float64) {
+func ADX(bars []domain.Candle, p int) (adx, plusDI, minusDI []float64) {
 	tr := TrueRange(bars)
 	plusDM := make([]float64, len(bars))
 	minusDM := make([]float64, len(bars))
@@ -521,7 +513,7 @@ func ADX(bars []Candle, p int) (adx, plusDI, minusDI []float64) {
 }
 
 // Donchian Channels: highest high / lowest low over p
-func Donchian(bars []Candle, p int) (upper, lower, middle []float64) {
+func Donchian(bars []domain.Candle, p int) (upper, lower, middle []float64) {
 	upper = make([]float64, len(bars))
 	lower = make([]float64, len(bars))
 	middle = make([]float64, len(bars))
@@ -548,7 +540,7 @@ func Donchian(bars []Candle, p int) (upper, lower, middle []float64) {
 }
 
 // Supertrend: returns supertrend line and direction (1 uptrend, -1 downtrend)
-func Supertrend(bars []Candle, atrPeriod int, multiplier float64) (trend []float64, dir []int) {
+func Supertrend(bars []domain.Candle, atrPeriod int, multiplier float64) (trend []float64, dir []int) {
 	atr := ATR(bars, atrPeriod)
 	basicUpper := make([]float64, len(bars))
 	basicLower := make([]float64, len(bars))
@@ -599,7 +591,7 @@ func Supertrend(bars []Candle, atrPeriod int, multiplier float64) (trend []float
 }
 
 // Ichimoku Cloud components: Tenkan (conversion), Kijun (base), Senkou A/B (leading), Chikou (lagging)
-func Ichimoku(bars []Candle, convPeriod, basePeriod, spanBPeriod, displacement int) (tenkan, kijun, senkouA, senkouB, chikou []float64) {
+func Ichimoku(bars []domain.Candle, convPeriod, basePeriod, spanBPeriod, displacement int) (tenkan, kijun, senkouA, senkouB, chikou []float64) {
 	n := len(bars)
 	tenkan = make([]float64, n)
 	kijun = make([]float64, n)
@@ -667,7 +659,7 @@ func Ichimoku(bars []Candle, convPeriod, basePeriod, spanBPeriod, displacement i
 }
 
 // PSAR Parabolic SAR (Wilder). af=acceleration factor, inc=increment, max=maximum
-func PSAR(bars []Candle, af, inc, afMax float64) []float64 {
+func PSAR(bars []domain.Candle, af, inc, afMax float64) []float64 {
 	n := len(bars)
 	out := make([]float64, n)
 	if n == 0 {
@@ -729,7 +721,7 @@ func PivotClassic(prevHigh, prevLow, prevClose float64) (pp, r1, r2, r3, s1, s2,
 }
 
 // Aroon Oscillator
-func Aroon(bars []Candle, p int) (up, down, osc []float64) {
+func Aroon(bars []domain.Candle, p int) (up, down, osc []float64) {
 	n := len(bars)
 	up = make([]float64, n)
 	down = make([]float64, n)
@@ -758,7 +750,7 @@ func Aroon(bars []Candle, p int) (up, down, osc []float64) {
 }
 
 // Vortex Indicator
-func Vortex(bars []Candle, p int) (viPlus, viMinus []float64) {
+func Vortex(bars []domain.Candle, p int) (viPlus, viMinus []float64) {
 	n := len(bars)
 	viPlus = make([]float64, n)
 	viMinus = make([]float64, n)
@@ -784,7 +776,7 @@ func Vortex(bars []Candle, p int) (viPlus, viMinus []float64) {
 }
 
 // Choppiness Index
-func ChoppinessIndex(bars []Candle, p int) []float64 {
+func ChoppinessIndex(bars []domain.Candle, p int) []float64 {
 	tr := TrueRange(bars)
 	out := make([]float64, len(bars))
 	for i := range bars {
@@ -831,7 +823,7 @@ func TRIX(values []float64, p int) []float64 {
 }
 
 // Awesome Oscillator: SMA(5) of median price - SMA(34) of median price
-func AwesomeOscillator(bars []Candle) []float64 {
+func AwesomeOscillator(bars []domain.Candle) []float64 {
 	n := len(bars)
 	med := make([]float64, n)
 	for i := range bars {
@@ -847,7 +839,7 @@ func AwesomeOscillator(bars []Candle) []float64 {
 }
 
 // Chaikin Money Flow (CMF)
-func ChaikinMoneyFlow(bars []Candle, p int) []float64 {
+func ChaikinMoneyFlow(bars []domain.Candle, p int) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		if i+1 < p {
@@ -874,7 +866,7 @@ func ChaikinMoneyFlow(bars []Candle, p int) []float64 {
 }
 
 // Twiggs Money Flow (approx)
-func TwiggsMoneyFlow(bars []Candle, p int) []float64 {
+func TwiggsMoneyFlow(bars []domain.Candle, p int) []float64 {
 	out := make([]float64, len(bars))
 	emaVol := EMA(ExtractVolumes(bars), p)
 	typ := make([]float64, len(bars))
@@ -898,7 +890,7 @@ func TwiggsMoneyFlow(bars []Candle, p int) []float64 {
 }
 
 // ExtractVolumes helper
-func ExtractVolumes(bars []Candle) []float64 {
+func ExtractVolumes(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		out[i] = bars[i].Volume
@@ -907,14 +899,14 @@ func ExtractVolumes(bars []Candle) []float64 {
 }
 
 // Median Price and its MA
-func MedianPrice(bars []Candle) []float64 {
+func MedianPrice(bars []domain.Candle) []float64 {
 	out := make([]float64, len(bars))
 	for i := range bars {
 		out[i] = (bars[i].High + bars[i].Low) / 2
 	}
 	return out
 }
-func MedianPriceMA(bars []Candle, p int) []float64 { return SMA(MedianPrice(bars), p) }
+func MedianPriceMA(bars []domain.Candle, p int) []float64 { return SMA(MedianPrice(bars), p) }
 
 // Pivot variants (Camarilla, CPR) left as TODOs with signatures
 func CamarillaPivots(prevHigh, prevLow, prevClose float64) (h1, h2, h3, h4, l1, l2, l3, l4 float64) {
@@ -923,10 +915,10 @@ func CamarillaPivots(prevHigh, prevLow, prevClose float64) (h1, h2, h3, h4, l1, 
 }
 
 // Standard Deviation on VWAP
-func StdDevOnVWAP(bars []Candle, p int) []float64 { return StdDev(VWAP(bars), p) }
+func StdDevOnVWAP(bars []domain.Candle, p int) []float64 { return StdDev(VWAP(bars), p) }
 
 // Opening Range helpers
-func OpeningRange(bars []Candle, window int) (high, low, open, close []float64) {
+func OpeningRange(bars []domain.Candle, window int) (high, low, open, close []float64) {
 	n := len(bars)
 	high = make([]float64, n)
 	low = make([]float64, n)
@@ -953,7 +945,7 @@ func OpeningRange(bars []Candle, window int) (high, low, open, close []float64) 
 }
 
 // Convenience: PrevN close/hlc/volume; offset<0 for previous bars.
-func PrevN(bars []Candle, field string, offset int) float64 {
+func PrevN(bars []domain.Candle, field string, offset int) float64 {
 	idx := len(bars) + offset
 	if idx < 0 || idx >= len(bars) {
 		return math.NaN()

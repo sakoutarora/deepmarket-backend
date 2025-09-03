@@ -95,7 +95,7 @@ func LoginHandler() fiber.Handler {
 }
 
 func GoogleOAuthHandler() fiber.Handler {
-	err := godotenv.Load()
+	err := godotenv.Load(".env.local")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
@@ -119,7 +119,7 @@ func GoogleOAuthHandler() fiber.Handler {
 }
 
 func GoogleCallbackHandler() fiber.Handler {
-	err := godotenv.Load()
+	err := godotenv.Load(".env.local")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

@@ -33,6 +33,7 @@ type Token struct {
 	Operator  string    `json:"operator,omitempty"` // +, >, AND, crosses_above, etc.
 	Value     float64   `json:"value,omitempty"`    // for number
 	Function  string    `json:"function,omitempty"`
+	Args      []Token   `json:"args,omitempty"`
 }
 
 type Condition struct {

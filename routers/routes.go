@@ -51,7 +51,7 @@ func Setup(app *fiber.App) {
 		return fiber.ErrUpgradeRequired
 	})
 
-	err := godotenv.Load()
+	err := godotenv.Load(".env.local")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

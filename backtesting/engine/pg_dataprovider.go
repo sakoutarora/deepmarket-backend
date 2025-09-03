@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	domain "github.com/gulll/deepmarket/backtesting/domain"
@@ -15,7 +16,7 @@ type PGProvider struct {
 
 func NewPGProvider(db *gorm.DB) *PGProvider { return &PGProvider{db: db} }
 
-func (p *PGProvider) LoadOHLCV(symbol string, tf domain.Timeframe) (map[string]Series, error) {
+func (p *PGProvider) LoadOHLCV(symbol string, tf domain.Timeframe) ([]domain.Candle, error) {
 	startTime := time.Now()
 	interval, found := domain.TimeframeToMinutes[tf]
 
@@ -25,10 +26,10 @@ func (p *PGProvider) LoadOHLCV(symbol string, tf domain.Timeframe) (map[string]S
 
 	rows, err := p.db.Raw(`
 		WITH base AS (
-			SELECT
+	SELECT 
 				*,
 				ROW_NUMBER() OVER (ORDER BY "time") AS global_row_num
-			FROM ohlc_data_nse_eq
+	FROM ohlc_data_nse_eq
 			WHERE ticker = ? AND "time" >= ? AND "time" <= ?
 		),
 		grouped AS (
@@ -53,41 +54,30 @@ func (p *PGProvider) LoadOHLCV(symbol string, tf domain.Timeframe) (map[string]S
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
-	var open, high, low, close, volume Series
+	var candles []domain.Candle
 
 	for rows.Next() {
-		var item struct {
-			IntervalStart time.Time
-			Open          float64
-			High          float64
-			Low           float64
-			Close         float64
-			Volume        float64
-		}
+		var item domain.Candle
 
-		if err := rows.Scan(&item.IntervalStart, &item.Open, &item.High, &item.Low, &item.Close, &item.Volume); err != nil {
+		if err := rows.Scan(
+			&item.Time,
+			&item.Open,
+			&item.High,
+			&item.Low,
+			&item.Close,
+			&item.Volume,
+		); err != nil {
 			return nil, err
 		}
 
-		open = append(open, item.Open)
-		high = append(high, item.High)
-		low = append(low, item.Low)
-		close = append(close, item.Close)
-		volume = append(volume, item.Volume)
+		candles = append(candles, item)
 	}
-	endTime := time.Now()
-	fmt.Printf("LoadOHLCV for %s took %s\n", symbol, endTime.Sub(startTime))
 
-	return map[string]Series{
-		"open":   open,
-		"high":   high,
-		"low":    low,
-		"close":  close,
-		"volume": volume,
-	}, nil
+	endTime := time.Now()
+	log.Printf("⏲️ LoadOHLCV for %s took %s\n", symbol, endTime.Sub(startTime))
+	return candles, nil
 }
 
 func (p *PGProvider) AlignTo(baseTF domain.Timeframe, ser Series, fromTF domain.Timeframe) (Series, error) {

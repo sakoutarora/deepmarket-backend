@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/gulll/deepmarket/backtesting/adapters"
+	"github.com/gulll/deepmarket/backtesting/controller"
 	domain "github.com/gulll/deepmarket/backtesting/domain"
 	engine "github.com/gulll/deepmarket/backtesting/engine"
 	"github.com/gulll/deepmarket/models"
@@ -8,52 +10,27 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-type BacktestReq struct {
-	Symbols    []string           `json:"symbols"`
-	BaseTF     domain.Timeframe   `json:"base_timeframe"`
-	Conditions []domain.Condition `json:"conditions"`
-	Start      *string            `json:"start,omitempty"`
-	End        *string            `json:"end,omitempty"`
-}
-
-type BacktestSymbolResult struct {
-	Symbol  string                   `json:"symbol"`
-	Signal  []bool                   `json:"signal"`
-	Entries []int                    `json:"entries"`
-	Ts      map[string]engine.Series `json:"ts"`
-}
-type BacktestResp struct {
-	BaseTF  domain.Timeframe       `json:"base_timeframe"`
-	Results []BacktestSymbolResult `json:"results"`
-}
-
 func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Handler {
 	parser := &engine.Parser{Reg: reg}
 
 	return func(c *fiber.Ctx) error {
-		var req BacktestReq
+		var req domain.BacktestReq
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(models.APIResponse{
 				Success: false,
-				Message: "Invalid Request format",
+				Message: "Invalid Request format " + err.Error(),
 			})
 		}
+
 		if _, ok := domain.AllowedTF[req.BaseTF]; !ok {
 			return c.Status(400).JSON(models.APIResponse{
 				Success: false,
 				Message: "Invalid Base Timeframe",
 			})
-
-		}
-		if len(req.Conditions) == 0 {
-			return c.Status(400).JSON(models.APIResponse{
-				Success: false,
-				Message: "No conditions provided",
-			})
 		}
 
-		// Parse the first condition’s tokens into a predicate
-		pred, err := parser.ParsePredicate(req.Conditions[0].Tokens)
+		// --- ENTRY PLAN ---
+		entryPred, err := parser.ParsePredicate(req.EntryConditions.Tokens)
 		if err != nil {
 			return c.Status(400).JSON(models.APIResponse{
 				Success: false,
@@ -61,46 +38,67 @@ func BacktestRunHandler(reg *engine.Registry, dp engine.DataProvider) fiber.Hand
 			})
 		}
 
-		results := make([]BacktestSymbolResult, 0, len(req.Symbols))
-		for _, sym := range req.Symbols {
-			ctx := engine.NewEvalCtx(sym, req.BaseTF, dp, reg)
-			ohlc, err := dp.LoadOHLCV(sym, req.BaseTF)
+		planner := engine.NewPlanner(req.BaseTF)
+		entryPlan, err := planner.Build(entryPred)
+		if err != nil {
+			return c.Status(400).JSON(models.APIResponse{
+				Success: false,
+				Message: err.Error(),
+			})
+		}
+
+		// --- EXIT PLAN (optional) ---
+		var exitPlan *engine.Plan // default nil
+		if req.ExitConditions != nil && len(req.ExitConditions.Tokens) > 0 {
+			exitPred, err := parser.ParsePredicate(req.ExitConditions.Tokens)
 			if err != nil {
-				return c.Status(500).JSON(models.APIResponse{
+				return c.Status(400).JSON(models.APIResponse{
 					Success: false,
 					Message: err.Error(),
 				})
 			}
 
-			ctx.SetCache(ohlc)
-			boolSer, err := ctx.EvalPred(pred)
+			planner = engine.NewPlanner(req.BaseTF)
+			exitPlan, err = planner.Build(exitPred)
 			if err != nil {
-				return c.Status(500).JSON(models.APIResponse{
+				return c.Status(400).JSON(models.APIResponse{
 					Success: false,
 					Message: err.Error(),
 				})
 			}
-			results = append(results, BacktestSymbolResult{
-				Symbol:  sym,
-				Signal:  boolSer,
-				Entries: risingEdges(boolSer),
-				Ts:      ctx.GetCache(),
+		}
+
+		// --- DATA LOADING ---
+		ctx := engine.NewEvalCtx(req.Symbol, req.BaseTF, dp, reg)
+		ohlc, err := dp.LoadOHLCV(req.Symbol, req.BaseTF)
+		if err != nil {
+			return c.Status(500).JSON(models.APIResponse{
+				Success: false,
+				Message: err.Error(),
 			})
 		}
+
+		ctx.SetCache(adapters.CandlesToSeries(ohlc))
+		rt := engine.NewRuntime(ctx)
+
+		// --- RUN BACKTEST ---
+		trades, _, equity, err := controller.RunBacktest(
+			req, req.Symbol, ctx, rt, entryPlan, exitPlan, ohlc,
+		)
+		if err != nil {
+			return c.Status(500).JSON(models.APIResponse{
+				Success: false,
+				Message: err.Error(),
+			})
+		}
+
+		// --- SUMMARY ---
+		summary := controller.ComputeSummary(trades, equity, float64(req.Capital))
+
 		return c.JSON(models.APIResponse{
 			Success: true,
 			Message: "Backtest completed",
-			Data:    BacktestResp{BaseTF: req.BaseTF, Results: results},
+			Data:    summary,
 		})
 	}
-}
-
-func risingEdges(b []bool) []int {
-	var idxs []int
-	for i := 1; i < len(b); i++ {
-		if !b[i-1] && b[i] {
-			idxs = append(idxs, i)
-		}
-	}
-	return idxs
 }
