@@ -24,32 +24,44 @@ func (p *PGProvider) LoadOHLCV(symbol string, tf domain.Timeframe) ([]domain.Can
 		return nil, fmt.Errorf("timeframe %q not supported", tf)
 	}
 
+	// NOTE: consider making start/end times function arguments instead of hardcoding strings.
 	rows, err := p.db.Raw(`
-		WITH base AS (
-	SELECT 
-				*,
-				ROW_NUMBER() OVER (ORDER BY "time") AS global_row_num
-	FROM ohlc_data_nse_eq
-			WHERE ticker = ? AND "time" >= ? AND "time" <= ?
+		WITH src AS (
+		  SELECT *
+		  FROM public.ohlc_data_nse_eq
+		  WHERE (time::time >= time '09:15:00' AND time::time <= time '15:30:00'
+		         AND ticker = ? AND "time" > ? AND "time" < ?)
 		),
-		grouped AS (
-			SELECT *,
-				(global_row_num - 1) / ? AS group_id,
-				ROW_NUMBER() OVER (PARTITION BY (global_row_num - 1) / ? ORDER BY "time") AS row_in_group,
-				COUNT(*) OVER (PARTITION BY (global_row_num - 1) / ?) AS rows_in_group
-			FROM base
+		annot AS (
+		  SELECT
+		    ticker,
+		    time,
+		    open, high, low, close, volume, oi,
+		    (date_trunc('day', time) + interval '9 hours 15 minutes') AS session_open,
+		    EXTRACT(EPOCH FROM (time - (date_trunc('day', time) + interval '9 hours 15 minutes'))) AS secs_since_open
+		  FROM src
+		),
+		buckets AS (
+		  SELECT
+		    ticker,
+		    time,
+		    open, high, low, close, volume, oi,
+		    session_open,
+		    FLOOR(secs_since_open / (60.0 * ?))::int AS bucket_no
+		  FROM annot
 		)
 		SELECT
-			MIN("time") AS interval_start,
-			MAX(CASE WHEN row_in_group = 1 THEN open END) AS open,
-			MAX(high) AS high,
-			MIN(low) AS low,
-			MAX(CASE WHEN row_in_group = rows_in_group THEN close END) AS close,
-			SUM(volume) AS volume
-		FROM grouped
-		GROUP BY group_id
-		ORDER BY group_id;
-	`, symbol, "2025-01-01", "2025-08-01", interval, interval, interval).Rows()
+		  -- bucket start timestamp
+		  (session_open + (bucket_no * make_interval(mins => ?))) AS bucket_start,
+		  (array_agg(open ORDER BY time ASC))[1] AS open,
+		  MAX(high)                             AS high,
+		  MIN(low)                              AS low,
+		  (array_agg(close ORDER BY time DESC))[1] AS close,
+		  SUM(volume)                           AS volume
+		FROM buckets
+		GROUP BY session_open, bucket_no
+		ORDER BY bucket_start;
+	`, symbol, "2025-01-01", "2025-08-01", interval, interval).Rows()
 
 	if err != nil {
 		return nil, err
@@ -60,7 +72,8 @@ func (p *PGProvider) LoadOHLCV(symbol string, tf domain.Timeframe) ([]domain.Can
 
 	for rows.Next() {
 		var item domain.Candle
-
+		// the query returns columns in this order:
+		// bucket_start, open, high, low, close, volume
 		if err := rows.Scan(
 			&item.Time,
 			&item.Open,

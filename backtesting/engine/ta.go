@@ -299,33 +299,60 @@ func Momentum(values []float64, p int) []float64 {
 }
 
 // RSI Relative Strength Index (Wilder's).
-func RSI(values []float64, p int) []float64 {
-	if p <= 0 || len(values) == 0 {
+func RSI(values []float64, period int) []float64 {
+	if period <= 0 || len(values) <= period {
 		return nil
 	}
+
 	out := make([]float64, len(values))
-	var prevGain, prevLoss float64
-	for i := 1; i < len(values); i++ {
-		chg := values[i] - values[i-1]
-		gain := math.Max(chg, 0)
-		loss := math.Max(-chg, 0)
-		if i <= p {
-			prevGain += gain
-			prevLoss += loss
-			if i == p {
-				avgGain := prevGain / float64(p)
-				avgLoss := prevLoss / float64(p)
-				rs := avgGain / max(avgLoss, 1e-12)
-				out[i] = 100 - 100/(1+rs)
-			}
-			continue
+
+	// Calculate initial gains and losses for the first period
+	var sumGain, sumLoss float64
+	for i := 1; i <= period; i++ {
+		change := values[i] - values[i-1]
+		if change > 0 {
+			sumGain += change
+		} else {
+			sumLoss += -change
 		}
-		avgGain := (prevGain*(float64(p-1)) + gain) / float64(p)
-		avgLoss := (prevLoss*(float64(p-1)) + loss) / float64(p)
-		prevGain, prevLoss = avgGain, avgLoss
-		rs := avgGain / max(avgLoss, 1e-12)
-		out[i] = 100 - 100/(1+rs)
 	}
+
+	// Calculate first RSI value using SMA
+	avgGain := sumGain / float64(period)
+	avgLoss := sumLoss / float64(period)
+
+	if avgLoss == 0 {
+		out[period] = 100
+	} else {
+		rs := avgGain / avgLoss
+		out[period] = 100 - (100 / (1 + rs))
+	}
+
+	// Calculate subsequent RSI values using Wilder's smoothing (EMA-like)
+	for i := period + 1; i < len(values); i++ {
+		change := values[i] - values[i-1]
+
+		var gain, loss float64
+		if change > 0 {
+			gain = change
+			loss = 0
+		} else {
+			gain = 0
+			loss = -change
+		}
+
+		// Wilder's smoothing: avgNew = (avgOld * (period-1) + newValue) / period
+		avgGain = (avgGain*float64(period-1) + gain) / float64(period)
+		avgLoss = (avgLoss*float64(period-1) + loss) / float64(period)
+
+		if avgLoss == 0 {
+			out[i] = 100
+		} else {
+			rs := avgGain / avgLoss
+			out[i] = 100 - (100 / (1 + rs))
+		}
+	}
+
 	return out
 }
 
